@@ -796,15 +796,15 @@
     </div>
 
     <div class="mode-toggle">
-      <span class="mode-label active" id="labelList" onclick="setMode('list')">List Mode</span>
-      <div class="toggle-track" id="modeTrack" onclick="toggleMode()">
+      <span class="mode-label" id="labelList" onclick="setMode('list')">List</span>
+      <div class="toggle-track on" id="modeTrack" onclick="toggleMode()">
         <div class="toggle-knob"></div>
       </div>
-      <span class="mode-label" id="labelCopy" onclick="setMode('copy')">Copy Mode</span>
+      <span class="mode-label active" id="labelCopy" onclick="setMode('copy')">Copy</span>
     </div>
 
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Type abbreviation here... (e.g. alignnn, ccgap, ccaky)" autocomplete="off" spellcheck="false">
+      <input type="text" id="searchInput" placeholder="Type abbreviation — answer auto-copies to clipboard" autocomplete="off" spellcheck="false">
       <div class="suggestions" id="suggestions"></div>
     </div>
 
@@ -914,7 +914,7 @@ let edits = JSON.parse(localStorage.getItem('gpca_edits') || '{}');
 let customEntries = JSON.parse(localStorage.getItem('gpca_custom') || '[]');
 let currentEntry = null;
 let isEditing = false;
-let copyMode = localStorage.getItem('gpca_mode') === 'copy';
+let copyMode = localStorage.getItem('gpca_mode') !== 'list';
 
 // Mode toggle
 function setMode(mode) {
