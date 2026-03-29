@@ -951,6 +951,9 @@ function verifyLogin() {
   loadData();
   renderHistory();
 }
+document.getElementById('loginPassword').addEventListener('input', function() {
+  if (this.value === '1122') verifyLogin();
+});
 document.getElementById('loginPassword').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') verifyLogin();
 });
