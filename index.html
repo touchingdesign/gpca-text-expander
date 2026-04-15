@@ -971,6 +971,14 @@
         <div class="history-empty">No recent searches yet. Start typing an abbreviation above.</div>
       </div>
     </div>
+
+    <div style="text-align:center; margin-top:24px;">
+      <button class="export-btn" onclick="showImportModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import from CSV
+      </button>
+      <input type="file" id="importFileInput" accept=".csv,text/csv" style="display:none;">
+    </div>
   </div>
 </div>
 
@@ -985,6 +993,22 @@
       <button class="modal-submit" onclick="verifyAndExport()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box">
+    <h3>Import CSV</h3>
+    <p>Enter password to import entries from a CSV file</p>
+    <input type="password" id="importPassword" placeholder="****" maxlength="20" autocomplete="off">
+    <div class="modal-error" id="importModalError"></div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeImportModal()">Cancel</button>
+      <button class="modal-submit" onclick="verifyAndImport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Choose File
       </button>
     </div>
   </div>
@@ -1374,6 +1398,151 @@ document.getElementById('exportPassword').addEventListener('keydown', function(e
 });
 document.getElementById('exportModal').addEventListener('click', function(e) {
   if (e.target === this) closeExportModal();
+});
+
+// Import functions
+function showImportModal() {
+  document.getElementById('importModal').classList.add('show');
+  document.getElementById('importPassword').value = '';
+  document.getElementById('importModalError').textContent = '';
+  document.getElementById('importPassword').classList.remove('error');
+  setTimeout(() => document.getElementById('importPassword').focus(), 100);
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('show');
+}
+
+function verifyAndImport() {
+  const pw = document.getElementById('importPassword').value;
+  if (pw !== '1122') {
+    document.getElementById('importModalError').textContent = 'Incorrect password. Please try again.';
+    document.getElementById('importPassword').classList.add('error');
+    document.getElementById('importPassword').value = '';
+    document.getElementById('importPassword').focus();
+    setTimeout(() => document.getElementById('importPassword').classList.remove('error'), 500);
+    return;
+  }
+  closeImportModal();
+  document.getElementById('importFileInput').click();
+}
+
+// Parse a single CSV line respecting quoted fields and escaped quotes
+function parseCSV(text) {
+  const rows = [];
+  let cur = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === ',') { cur.push(field); field = ''; i++; continue; }
+    if (c === '\r') { i++; continue; }
+    if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; i++; continue; }
+    field += c; i++;
+  }
+  if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
+  return rows;
+}
+
+function importCSV(text) {
+  // Strip UTF-8 BOM if present
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = parseCSV(text).filter(r => r.some(c => c && c.trim().length > 0));
+  if (rows.length === 0) {
+    showToast('CSV file is empty', 'error');
+    return;
+  }
+  // Detect header: if first row first cell equals "Abbreviation" (case-insensitive), skip it
+  let startIdx = 0;
+  const first = (rows[0][0] || '').trim().toLowerCase();
+  if (first === 'abbreviation' || first === 'abbr') startIdx = 1;
+
+  let updated = 0, added = 0, skipped = 0;
+  for (let r = startIdx; r < rows.length; r++) {
+    const row = rows[r];
+    const abbr = (row[0] || '').trim();
+    const topic = (row[1] || '').trim();
+    const answer = (row[2] || '').trim();
+    if (!abbr || !answer) { skipped++; continue; }
+
+    const existing = entries.find(e => e.abbr === abbr);
+    if (existing) {
+      existing.answer = answer;
+      if (topic) existing.topic = topic;
+      if (existing.isCustom) {
+        const idx = customEntries.findIndex(c => c.a === abbr);
+        if (idx >= 0) {
+          customEntries[idx].r = answer;
+          if (topic) customEntries[idx].t = topic;
+        }
+      } else {
+        edits[abbr] = answer;
+      }
+      updated++;
+    } else {
+      const newEntry = { abbr, topic: topic || 'Custom', question: '', answer, isCustom: true };
+      entries.push(newEntry);
+      customEntries.push({ a: abbr, t: topic || 'Custom', q: '', r: answer });
+      added++;
+    }
+  }
+
+  localStorage.setItem('gpca_edits', JSON.stringify(edits));
+  localStorage.setItem('gpca_custom', JSON.stringify(customEntries));
+
+  // Refresh stats + category dropdown
+  const topics = [...new Set(entries.map(e => e.topic).filter(Boolean))];
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><strong>${entries.length}</strong> abbreviations loaded</div>` +
+    `<div class="stat"><strong>${topics.length}</strong> categories</div>`;
+  const select = document.getElementById('newCategory');
+  select.innerHTML = '<option value="">-- Select category --</option>' +
+    topics.sort().map(t => `<option value="${t}">${t}</option>`).join('') +
+    '<option value="__custom__">+ New category...</option>';
+
+  // If current result is showing, refresh it
+  if (currentEntry) {
+    const refreshed = entries.find(e => e.abbr === currentEntry.abbr);
+    if (refreshed) showResult(refreshed);
+  }
+
+  showToast(`Imported: ${updated} updated, ${added} added${skipped ? ', ' + skipped + ' skipped' : ''}`, 'success');
+}
+
+document.getElementById('importFileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      importCSV(ev.target.result);
+    } catch (err) {
+      showToast('Failed to parse CSV: ' + err.message, 'error');
+    }
+    e.target.value = ''; // reset so same file can be picked again
+  };
+  reader.onerror = function() {
+    showToast('Failed to read file', 'error');
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('importPassword').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') verifyAndImport();
+  if (e.key === 'Escape') closeImportModal();
+});
+document.getElementById('importModal').addEventListener('click', function(e) {
+  if (e.target === this) closeImportModal();
 });
 
 function addToHistory(entry) {
