@@ -755,6 +755,82 @@
   }
   .toggle-track.on .toggle-knob { left: 22px; }
 
+  /* Answer search */
+  .answer-search-section {
+    margin-bottom: 20px;
+  }
+  .answer-search-section .search-box {
+    position: relative;
+    margin-bottom: 0;
+  }
+  .answer-search-section input {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 15px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    background: #fff;
+  }
+  .answer-search-section input:focus {
+    border-color: #4a6cf7;
+    box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.15);
+  }
+  .answer-search-section input::placeholder { color: #aaa; }
+  .answer-search-results {
+    margin-top: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+  }
+  .answer-search-results.show { display: block; }
+  .answer-search-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fff;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: background 0.15s;
+  }
+  .answer-search-item:hover { background: #f5f7ff; }
+  .answer-search-item .abbr-tag {
+    font-weight: 700;
+    color: #4a6cf7;
+    margin-right: 8px;
+    font-size: 13px;
+  }
+  .answer-search-item .answer-preview {
+    font-size: 13px;
+    color: #555;
+    display: block;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .answer-search-item .answer-preview mark {
+    background: #fff3cd;
+    color: #333;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  .answer-search-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .answer-search-count {
+    font-weight: 400;
+    color: #999;
+    font-size: 12px;
+  }
+
   /* 2-column history grid */
   .history-grid {
     display: grid;
@@ -878,6 +954,17 @@
       </div>
     </div>
 
+    <div class="answer-search-section">
+      <div class="answer-search-label">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search by Answer
+      </div>
+      <div class="search-box">
+        <input type="text" id="answerSearchInput" placeholder="Search within answers..." autocomplete="off" spellcheck="false">
+      </div>
+      <div class="answer-search-results" id="answerSearchResults"></div>
+    </div>
+
     <div class="history-section" id="historySection">
       <div class="history-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -886,6 +973,14 @@
       <div id="historyList">
         <div class="history-empty">No recent searches yet. Start typing an abbreviation above.</div>
       </div>
+    </div>
+
+    <div style="text-align:center; margin-top:24px;">
+      <button class="export-btn" onclick="showImportModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import from CSV
+      </button>
+      <input type="file" id="importFileInput" accept=".csv,text/csv" style="display:none;">
     </div>
   </div>
 </div>
@@ -901,6 +996,22 @@
       <button class="modal-submit" onclick="verifyAndExport()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box">
+    <h3>Import CSV</h3>
+    <p>Enter password to import entries from a CSV file</p>
+    <input type="password" id="importPassword" placeholder="****" maxlength="20" autocomplete="off">
+    <div class="modal-error" id="importModalError"></div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeImportModal()">Cancel</button>
+      <button class="modal-submit" onclick="verifyAndImport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Choose File
       </button>
     </div>
   </div>
@@ -1292,6 +1403,151 @@ document.getElementById('exportModal').addEventListener('click', function(e) {
   if (e.target === this) closeExportModal();
 });
 
+// Import functions
+function showImportModal() {
+  document.getElementById('importModal').classList.add('show');
+  document.getElementById('importPassword').value = '';
+  document.getElementById('importModalError').textContent = '';
+  document.getElementById('importPassword').classList.remove('error');
+  setTimeout(() => document.getElementById('importPassword').focus(), 100);
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('show');
+}
+
+function verifyAndImport() {
+  const pw = document.getElementById('importPassword').value;
+  if (pw !== '1122') {
+    document.getElementById('importModalError').textContent = 'Incorrect password. Please try again.';
+    document.getElementById('importPassword').classList.add('error');
+    document.getElementById('importPassword').value = '';
+    document.getElementById('importPassword').focus();
+    setTimeout(() => document.getElementById('importPassword').classList.remove('error'), 500);
+    return;
+  }
+  closeImportModal();
+  document.getElementById('importFileInput').click();
+}
+
+// Parse a single CSV line respecting quoted fields and escaped quotes
+function parseCSV(text) {
+  const rows = [];
+  let cur = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === ',') { cur.push(field); field = ''; i++; continue; }
+    if (c === '\r') { i++; continue; }
+    if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; i++; continue; }
+    field += c; i++;
+  }
+  if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
+  return rows;
+}
+
+function importCSV(text) {
+  // Strip UTF-8 BOM if present
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = parseCSV(text).filter(r => r.some(c => c && c.trim().length > 0));
+  if (rows.length === 0) {
+    showToast('CSV file is empty', 'error');
+    return;
+  }
+  // Detect header: if first row first cell equals "Abbreviation" (case-insensitive), skip it
+  let startIdx = 0;
+  const first = (rows[0][0] || '').trim().toLowerCase();
+  if (first === 'abbreviation' || first === 'abbr') startIdx = 1;
+
+  let updated = 0, added = 0, skipped = 0;
+  for (let r = startIdx; r < rows.length; r++) {
+    const row = rows[r];
+    const abbr = (row[0] || '').trim();
+    const topic = (row[1] || '').trim();
+    const answer = (row[2] || '').trim();
+    if (!abbr || !answer) { skipped++; continue; }
+
+    const existing = entries.find(e => e.abbr === abbr);
+    if (existing) {
+      existing.answer = answer;
+      if (topic) existing.topic = topic;
+      if (existing.isCustom) {
+        const idx = customEntries.findIndex(c => c.a === abbr);
+        if (idx >= 0) {
+          customEntries[idx].r = answer;
+          if (topic) customEntries[idx].t = topic;
+        }
+      } else {
+        edits[abbr] = answer;
+      }
+      updated++;
+    } else {
+      const newEntry = { abbr, topic: topic || 'Custom', question: '', answer, isCustom: true };
+      entries.push(newEntry);
+      customEntries.push({ a: abbr, t: topic || 'Custom', q: '', r: answer });
+      added++;
+    }
+  }
+
+  localStorage.setItem('gpca_edits', JSON.stringify(edits));
+  localStorage.setItem('gpca_custom', JSON.stringify(customEntries));
+
+  // Refresh stats + category dropdown
+  const topics = [...new Set(entries.map(e => e.topic).filter(Boolean))];
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><strong>${entries.length}</strong> abbreviations loaded</div>` +
+    `<div class="stat"><strong>${topics.length}</strong> categories</div>`;
+  const select = document.getElementById('newCategory');
+  select.innerHTML = '<option value="">-- Select category --</option>' +
+    topics.sort().map(t => `<option value="${t}">${t}</option>`).join('') +
+    '<option value="__custom__">+ New category...</option>';
+
+  // If current result is showing, refresh it
+  if (currentEntry) {
+    const refreshed = entries.find(e => e.abbr === currentEntry.abbr);
+    if (refreshed) showResult(refreshed);
+  }
+
+  showToast(`Imported: ${updated} updated, ${added} added${skipped ? ', ' + skipped + ' skipped' : ''}`, 'success');
+}
+
+document.getElementById('importFileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      importCSV(ev.target.result);
+    } catch (err) {
+      showToast('Failed to parse CSV: ' + err.message, 'error');
+    }
+    e.target.value = ''; // reset so same file can be picked again
+  };
+  reader.onerror = function() {
+    showToast('Failed to read file', 'error');
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('importPassword').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') verifyAndImport();
+  if (e.key === 'Escape') closeImportModal();
+});
+document.getElementById('importModal').addEventListener('click', function(e) {
+  if (e.target === this) closeImportModal();
+});
+
 function addToHistory(entry) {
   // Remove duplicate if already in history
   recentSearches = recentSearches.filter(e => e.abbr !== entry.abbr);
@@ -1397,6 +1653,53 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.search-box')) {
     document.getElementById('suggestions').classList.remove('show');
   }
+});
+
+// Answer search
+const answerInput = document.getElementById('answerSearchInput');
+const answerResults = document.getElementById('answerSearchResults');
+
+function searchAnswers(query) {
+  if (!query || query.length < 2) {
+    answerResults.classList.remove('show');
+    return;
+  }
+  const q = query.toLowerCase();
+  const matches = entries.filter(e =>
+    e.answer.toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  if (matches.length === 0) {
+    answerResults.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">No answers match your search.</div>';
+    answerResults.classList.add('show');
+    return;
+  }
+
+  answerResults.innerHTML = '<div class="answer-search-count">' + matches.length + (matches.length === 20 ? '+' : '') + ' results</div>' +
+    matches.map(m => {
+      const idx = m.answer.toLowerCase().indexOf(q);
+      const start = Math.max(0, idx - 40);
+      const end = Math.min(m.answer.length, idx + q.length + 60);
+      let preview = (start > 0 ? '...' : '') +
+        escapeHtml(m.answer.slice(start, idx)) +
+        '<mark>' + escapeHtml(m.answer.slice(idx, idx + q.length)) + '</mark>' +
+        escapeHtml(m.answer.slice(idx + q.length, end)) +
+        (end < m.answer.length ? '...' : '');
+      return `<div class="answer-search-item" onclick="selectEntry('${m.abbr}');answerInput.value='';answerResults.classList.remove('show');">
+        <span class="abbr-tag">${escapeHtml(m.abbr)}</span>
+        <span class="topic-tag" style="font-size:12px;color:#888;">${escapeHtml(m.topic)}</span>
+        <span class="answer-preview">${preview}</span>
+      </div>`;
+    }).join('');
+  answerResults.classList.add('show');
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+answerInput.addEventListener('input', (e) => {
+  searchAnswers(e.target.value.trim());
 });
 
 // Load on page ready
